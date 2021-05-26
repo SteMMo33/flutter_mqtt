@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:mqtt_client/mqtt_client.dart';
 import 'package:mqtt_client/mqtt_server_client.dart';
+//import 'package:mqtt_client/mqtt_client.dart';
+//import 'package:mqtt_client/mqtt_server_client.dart';
 //import 'package:typed_data/typed_buffers.dart';
 
 
@@ -19,14 +21,6 @@ class MyApp extends StatelessWidget {
       title: 'Flutter MQTT',
       theme: ThemeData(
         // This is the theme of your application.
-        //
-        // Try running your application with "flutter run". You'll see the
-        // application has a blue toolbar. Then, without quitting the app, try
-        // changing the primarySwatch below to Colors.green and then invoke
-        // "hot reload" (press "r" in the console where you ran "flutter run",
-        // or simply save your changes to "hot reload" in a Flutter IDE).
-        // Notice that the counter didn't reset back to zero; the application
-        // is not restarted.
         primarySwatch: Colors.blue,
       ),
       home: MyHomePage(title: 'MQTT Demo'),
@@ -56,6 +50,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String state = "init";
   String server = "server";
+  String mqttMsg = "- -";
 
   MqttClient? _client;
 
@@ -72,10 +67,15 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  updateMsg(String newMsg){
+    setState(() {
+      mqttMsg = newMsg;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
+    // This method is rerun every time setState is called
     //
     // The Flutter framework has been optimized to make rerunning build methods
     // fast, so that you can just rebuild anything that needs updating rather
@@ -94,25 +94,14 @@ class _MyHomePageState extends State<MyHomePage> {
           // arranges them vertically. By default, it sizes itself to fit its
           // children horizontally, and tries to be as tall as its parent.
           //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
+            Text( 'Server: $server',   ),
+            Text( 'State: $state',     ),
+            Text( 'MQTT message:',     ),
             Text(
-              'Server: $server',
-            ),
-            Text(
-              'State: $state',
-            ),
-            Text(
-              'MQTT message:',
-            ),
-            Text(
-              '- -',
-              style: Theme.of(context).textTheme.headline4,
+              mqttMsg,
+              style: Theme.of(context).textTheme.headline5,
             ),
             ElevatedButton(onPressed: sendMqtt, child: Text('Send'))
           ],
@@ -128,9 +117,10 @@ class _MyHomePageState extends State<MyHomePage> {
 
 
 
+  /// Invia un messaggio
   void sendMqtt(){
 
-    if (_client!=null){
+    if (_client==null){
       updateState("NON CONNESSO");
       return;
     }
@@ -143,15 +133,14 @@ class _MyHomePageState extends State<MyHomePage> {
     _client?.publishMessage( pubTopic, MqttQos.atLeastOnce, builder.payload!);
   }
 
-
+  /// Connessione al broker
   void startMqtt(){
     // Disconnette se attivo
     if (_client!=null) _client?.disconnect();
 
     updateState("connecting..");
     connect().then(
-            (client) {
-              print("!!!");
+        (client) {
               _client = client;
               print(client.connectionStatus);
               client.subscribe("stemmo21/#", MqttQos.atLeastOnce);
@@ -162,9 +151,11 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<MqttServerClient> connect() async {
 
     // MqttServerClient client = MqttServerClient.withPort('broker.emqx.io', 'flutter_client', 1883);
-    MqttServerClient client = MqttServerClient.withPort('broker.emqx.io', 'flutter_client', 8083);
-    //MqttServerClient client = MqttServerClient.withPort('broker.mqttdashboard.com', 'flutter_client', 8000);
-    client.logging(on: true);
+    //MqttServerClient client = MqttServerClient.withPort('broker.emqx.io', 'flutter_client', 8083);            // websocket ?
+    //MqttServerClient client = MqttServerClient.withPort('broker.mqttdashboard.com', 'flutter_client', 8000);  // websocket ?
+    MqttServerClient client = MqttServerClient.withPort('test.mosquitto.org', 'flutter_client', 1883);
+
+    client.logging(on: false);  // Aggiunge scritte di debug nel terminale
 
     updateServer(client.server+":"+client.port.toString());
 
@@ -174,10 +165,10 @@ class _MyHomePageState extends State<MyHomePage> {
     client.onUnsubscribed = onUnsubscribed;
     client.onSubscribed = onSubscribed;
     client.onSubscribeFail = onSubscribeFail;
-    client.pongCallback = pong;
+    // client.pongCallback = pong;
 
     final connMessage = MqttConnectMessage()
-        //.authenticateAs('username', 'password')
+        // SM .authenticateAs('username', 'password')
         // SM deprecated .keepAliveFor(60)
         .withWillTopic('willtopic')
         .withWillMessage('Will message')
@@ -192,13 +183,17 @@ class _MyHomePageState extends State<MyHomePage> {
       client.disconnect();
     }
 
-    client.updates?.listen((List<MqttReceivedMessage<MqttMessage>> c) {
-      // final MqttPublishMessage message = c[0].payload;
-      //final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message);
+    // In ascolto ..
+    client.updates!.listen((List<MqttReceivedMessage<MqttMessage>> c) {
+
+      print("Lista n: ${c.length}");
+
+      final message = c[0].payload as MqttPublishMessage;
+      final payload = MqttPublishPayload.bytesToStringAsString(message.payload.message!);
       //print('Received message:$payload from topic: ${c[0].topic}>');
 
-      final MqttMessage message = c[0].payload;
-      print('Received message:$message from topic: ${c[0].topic}>');
+      String msg = "$payload da ${c[0].topic}";
+      updateMsg(msg);
       updateState("RX");
     });
 

@@ -29,3 +29,11 @@ https://pub.dev/packages/mqtt_client
 
 
 
+Test
+--
+$ mosquitto_sub -h test.mosquitto.org -p 1883 -t stemmo21/#
+
+$ mosquitto_pub -h test.mosquitto.org -p 1883 -t stemmo21/21 -m Ciao
+
+
+
